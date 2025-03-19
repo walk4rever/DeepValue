@@ -1,57 +1,81 @@
-# DeepValue
+# DeepValue - 智能投资分析平台
 
-智能投资分析平台 - 利用人工智能和大数据分析，为您提供深度价值投资洞察
+一个使用AWS Bedrock Claude模型的智能投资分析平台，可以帮助用户分析股票、解答投资问题或提供市场见解。
 
-## 项目概述
+## 功能特点
 
-DeepValue 是一个基于网页的投资分析平台，旨在帮助投资者做出更明智的投资决策。该平台整合了财务数据分析、价值投资筛选和人工智能辅助决策等功能。
+- 与Claude AI模型对话，获取投资建议
+- 分析股票基本面
+- 行业对比分析
+- 财务健康评估
+- 投资组合优化
+- **全面数据分析**: 整合财务报表、市场数据、行业趋势等多维度信息
+- **价值投资筛选**: 基于巴菲特、格雷厄姆等投资大师的价值投资理念
+- **AI辅助决策**: 运用先进的机器学习算法，预测股票走势
 
-## 快速开始
+## 安装与设置
 
-### 方法 1: 直接在浏览器中打开
+1. 克隆仓库
+```
+git clone <repository-url>
+cd DeepValue
+```
 
-最简单的方法是直接在浏览器中打开 HTML 文件:
+2. 安装依赖
+```
+npm install
+```
 
-1. 在文件浏览器中找到 `index.html` 文件
-2. 双击该文件，它将在您的默认浏览器中打开
+3. 配置AWS凭证
+将`.env.aws.example`文件复制为`.env.aws`，并填入您的AWS凭证：
+```
+cp .env.aws.example .env.aws
+```
+然后编辑`.env.aws`文件，填入您的AWS访问密钥和区域信息。
 
-### 方法 2: 使用 Python 的 HTTP 服务器
+4. 启动服务器
+```
+npm start
+```
 
-如果您想模拟真实的网络环境，可以使用 Python 的内置 HTTP 服务器:
+5. 访问应用
+在浏览器中打开`http://localhost:3000`
 
-1. 打开终端
-2. 导航到项目目录: `cd /path/to/DeepValue`
-3. 运行以下命令:
-   - Python 3: `python -m http.server 8000`
-   - Python 2: `python -m SimpleHTTPServer 8000`
-4. 在浏览器中访问: `http://localhost:8000`
+## 使用方法
 
-### 方法 3: 使用 Node.js 的 http-server
+1. 在聊天框中输入您的投资相关问题
+2. 点击"发送"按钮或按回车键发送消息
+3. 等待AI助手回复
+4. 您也可以点击预设的分析选项或工具选项来快速提问
 
-如果您已安装 Node.js:
+## 技术栈
 
-1. 全局安装 http-server: `npm install -g http-server`
-2. 导航到项目目录: `cd /path/to/DeepValue`
-3. 运行: `http-server -p 8000`
-4. 在浏览器中访问: `http://localhost:8000`
+- 前端：HTML, CSS, JavaScript
+- 后端：Node.js, Express
+- AI模型：AWS Bedrock Claude
+- 其他：AWS SDK, dotenv
 
 ## 项目结构
 
 ```
 DeepValue/
 ├── index.html      # 主页面
+├── server.js       # 后端服务器
+├── package.json    # 项目依赖
+├── .env.aws        # AWS凭证配置（需自行创建）
+├── .env.aws.example # AWS凭证示例
 └── README.md       # 项目说明文档
 ```
 
-## 功能特点
+## 注意事项
 
-- **全面数据分析**: 整合财务报表、市场数据、行业趋势等多维度信息
-- **价值投资筛选**: 基于巴菲特、格雷厄姆等投资大师的价值投资理念
-- **AI辅助决策**: 运用先进的机器学习算法，预测股票走势
+- 确保您的AWS账户已启用Bedrock服务并有权限使用Claude模型
+- 本应用仅供学习和研究使用，不构成投资建议
+- 请勿在生产环境中使用示例代码，应当进行适当的安全加固
 
 ## 未来开发计划
 
-- 实现后端 API 连接
 - 添加用户认证系统
 - 开发个性化投资组合推荐功能
 - 集成实时市场数据
+- 添加历史对话保存功能

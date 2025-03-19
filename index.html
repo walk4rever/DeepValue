@@ -104,40 +104,108 @@
         box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.08);
         border-color: #0066cc;
       }
-      .search-area {
+      /* Chatbot Styles */
+      .chatbot-container {
+        width: 100%;
+        max-width: 700px;
+        background-color: #fff;
+        border-radius: 0.75rem;
+        box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.05);
+        margin-bottom: 2rem;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .chatbot-header {
+        background-color: #0066cc;
+        color: white;
+        padding: 1rem;
+        font-weight: 500;
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        width: 100%;
-        max-width: 600px;
       }
-      .search-input {
+      .chatbot-header-icon {
+        font-size: 1.25rem;
+      }
+      .chat-messages {
+        padding: 1rem;
+        height: 350px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .message {
+        max-width: 80%;
+        padding: 0.75rem 1rem;
+        border-radius: 1rem;
+        line-height: 1.4;
+        font-size: 0.95rem;
+      }
+      .user-message {
+        background-color: #e6f2ff;
+        color: #0066cc;
+        align-self: flex-end;
+        border-bottom-right-radius: 0.25rem;
+      }
+      .bot-message {
+        background-color: #f5f5f5;
+        color: #333;
+        align-self: flex-start;
+        border-bottom-left-radius: 0.25rem;
+      }
+      .chat-input-area {
+        display: flex;
+        padding: 1rem;
+        border-top: 1px solid #e0e0e0;
+        background-color: #f9f9f9;
+      }
+      .chat-input {
         flex: 1;
         padding: 0.75rem;
-        border-radius: 0.5rem 0 0 0.5rem;
-        font-size: 1rem;
+        border-radius: 1.5rem;
         border: 1px solid #e0e0e0;
-        border-right: none;
         outline: none;
+        font-size: 0.95rem;
         transition: border-color 0.2s ease, box-shadow 0.2s ease;
       }
-      .search-input:focus {
+      .chat-input:focus {
         border-color: #0066cc;
         box-shadow: 0 0 0 0.125rem rgba(0, 102, 204, 0.25);
       }
-      .search-button {
-        padding: 0.75rem 1.5rem;
+      .send-button {
+        margin-left: 0.5rem;
+        padding: 0.75rem 1.25rem;
         background-color: #0066cc;
         color: #fff;
         border: none;
-        border-radius: 0 0.5rem 0.5rem 0;
-        font-size: 1rem;
+        border-radius: 1.5rem;
+        font-size: 0.95rem;
         cursor: pointer;
-        transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        transition: background-color 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
-      .search-button:hover {
+      .send-button:hover {
         background-color: #0052a3;
-        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.08);
+      }
+      .send-button:disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+      }
+      .loading-indicator {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
       }
       .tools-section {
         margin-top: 1.5rem;
@@ -216,33 +284,28 @@
         <header class="header">
             <div class="logo">
                 <div class="logo-icon"></div>
-                <span class="logo-text">DeepValue</span>
+                <span class="logo-text">DeepValue = GenAI x 价值投资</span>
             </div>
             <div class="header-actions">
                 <button class="premium-button">升级至高级版</button>
             </div>
         </header>
         <main class="main-content">
-            <h1 class="greeting">智能投资分析平台</h1>
-            <p class="subtitle">利用人工智能和大数据分析，为您提供深度价值投资洞察，助您做出明智的投资决策</p>
-            
-            <div class="analysis-options">
-                <button class="option-button">分析股票基本面</button>
-                <button class="option-button">行业对比分析</button>
-                <button class="option-button">财务健康评估</button>
-                <button class="option-button">投资组合优化</button>
-            </div>
-            
-            <div class="search-area">
-                <input type="text" class="search-input" placeholder="输入股票代码或公司名称">
-                <button class="search-button">开始分析</button>
-            </div>
-            
-            <div class="tools-section">
-                <span class="tool-chip">深度研究</span>
-                <span class="tool-chip">技术分析</span>
-                <span class="tool-chip">估值模型</span>
-                <span class="tool-chip">风险评估</span>
+          
+            <div class="chatbot-container">
+                <div class="chatbot-header">
+                    <span class="chatbot-header-icon">🤖</span>
+                    <span>ValueBot, Powered by Amazon Bedrock</span>
+                </div>
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message bot-message">
+                        您好！我是您的投资AI助手。我可以帮您分析股票、解答投资问题或提供市场见解。请告诉我您想了解什么？
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <input type="text" class="chat-input" id="userInput" placeholder="输入您的问题..." autocomplete="off">
+                    <button class="send-button" id="sendButton">发送</button>
+                </div>
             </div>
             
             <div class="features-section">
@@ -269,5 +332,108 @@
             © 2025 DeepValue - 智能投资分析平台
         </footer>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatMessages = document.getElementById('chatMessages');
+            const userInput = document.getElementById('userInput');
+            const sendButton = document.getElementById('sendButton');
+            
+            // 发送消息函数
+            async function sendMessage() {
+                const userMessage = userInput.value.trim();
+                if (!userMessage) return;
+                
+                // 清空输入框
+                userInput.value = '';
+                
+                // 添加用户消息到聊天界面
+                addMessage(userMessage, 'user');
+                
+                // 显示加载状态
+                sendButton.disabled = true;
+                sendButton.innerHTML = '<span class="loading-indicator"></span>';
+                
+                try {
+                    // 调用后端API
+                    const response = await fetch('http://localhost:3001/api/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ message: userMessage })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // 添加 AI 回复到聊天界面
+                    addMessage(data.response, 'bot');
+                } catch (error) {
+                    console.error('Error calling API:', error);
+                    addMessage('抱歉，我遇到了一些问题。请稍后再试。', 'bot');
+                } finally {
+                    // 恢复发送按钮状态
+                    sendButton.disabled = false;
+                    sendButton.textContent = '发送';
+                }
+            }
+            
+            // 添加消息到聊天界面
+            function addMessage(text, sender) {
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('message');
+                messageDiv.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
+                messageDiv.textContent = text;
+                
+                chatMessages.appendChild(messageDiv);
+                
+                // 滚动到最新消息
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // 事件监听器
+            sendButton.addEventListener('click', sendMessage);
+            
+            userInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            // 示例问题点击事件
+            document.querySelectorAll('.option-button').forEach(button => {
+                button.addEventListener('click', function() {
+                    const questions = {
+                        '分析股票基本面': '请分析苹果公司(AAPL)的基本面情况',
+                        '行业对比分析': '请比较中国几大银行股的投资价值',
+                        '财务健康评估': '请评估特斯拉(TSLA)的财务健康状况',
+                        '投资组合优化': '如何构建一个平衡的科技股投资组合'
+                    };
+                    
+                    userInput.value = questions[this.textContent] || '';
+                    userInput.focus();
+                });
+            });
+            
+            // 工具选项点击事件
+            document.querySelectorAll('.tool-chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    const tools = {
+                        '深度研究': '请对亚马逊(AMZN)进行深度研究分析',
+                        '技术分析': '请对比特币近期走势进行技术分析',
+                        '估值模型': '请介绍几种常用的股票估值模型',
+                        '风险评估': '如何评估投资组合的风险'
+                    };
+                    
+                    userInput.value = tools[this.textContent] || '';
+                    userInput.focus();
+                });
+            });
+        });
+    </script>
 </body>
 </html>
