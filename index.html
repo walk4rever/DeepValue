@@ -123,10 +123,28 @@
         font-weight: 500;
         display: flex;
         align-items: center;
+        justify-content: space-between;
+      }
+      .chatbot-header-left {
+        display: flex;
+        align-items: center;
         gap: 0.5rem;
       }
       .chatbot-header-icon {
         font-size: 1.25rem;
+      }
+      .model-selector {
+        background-color: white;
+        color: #0066cc;
+        border: none;
+        border-radius: 0.25rem;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+        cursor: pointer;
+        outline: none;
+      }
+      .model-selector:hover {
+        background-color: #f0f7ff;
       }
       .chat-messages {
         padding: 1rem;
@@ -294,8 +312,15 @@
           
             <div class="chatbot-container">
                 <div class="chatbot-header">
-                    <span class="chatbot-header-icon">🤖</span>
-                    <span>ValueBot, Powered by Amazon Bedrock</span>
+                    <div class="chatbot-header-left">
+                        <span class="chatbot-header-icon">🤖</span>
+                        <span>ValueBot</span>
+                    </div>
+                    <div class="chatbot-header-right">
+                        <select id="modelSelector" class="model-selector">
+                            <option value="">加载模型中...</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="chat-messages" id="chatMessages">
                     <div class="message bot-message">
@@ -329,7 +354,7 @@
             </div>
         </main>
         <footer class="footer">
-            © 2025 DeepValue - 智能投资分析平台
+            © 2025 DeepValue = GenAI x 价值投资. All Rights Reserved.
         </footer>
     </div>
 
@@ -338,11 +363,92 @@
             const chatMessages = document.getElementById('chatMessages');
             const userInput = document.getElementById('userInput');
             const sendButton = document.getElementById('sendButton');
+            const modelSelector = document.getElementById('modelSelector');
+            
+            // 加载可用模型列表
+            async function loadModels() {
+                try {
+                    const response = await fetch('http://localhost:3001/api/models');
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch models');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // 清空选择器
+                    modelSelector.innerHTML = '';
+                    
+                    // 按提供商分组模型
+                    const modelsByProvider = {};
+                    data.models.forEach(model => {
+                        if (!modelsByProvider[model.provider]) {
+                            modelsByProvider[model.provider] = [];
+                        }
+                        modelsByProvider[model.provider].push(model);
+                    });
+                    
+                    // 为每个提供商创建一个optgroup
+                    for (const provider in modelsByProvider) {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = provider;
+                        
+                        // 添加该提供商的所有模型
+                        modelsByProvider[provider].forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model.id;
+                            
+                            // 显示模型名称，如果不支持按需调用则添加标记
+                            let modelText = model.name;
+                            if (!model.supportedTypes.includes('ON_DEMAND')) {
+                                modelText += ' (需要推理配置文件)';
+                                option.disabled = true; // 禁用不支持按需调用的模型
+                            }
+                            option.textContent = modelText;
+                            
+                            // 如果是默认模型，设置为选中
+                            if (model.id === data.defaultModelId) {
+                                option.selected = true;
+                            }
+                            
+                            optgroup.appendChild(option);
+                        });
+                        
+                        modelSelector.appendChild(optgroup);
+                    }
+                    
+                    // 如果没有找到默认模型，添加一个提示
+                    if (data.defaultModelId && !modelSelector.value) {
+                        const option = document.createElement('option');
+                        option.value = data.defaultModelId;
+                        option.textContent = `默认模型 (${data.defaultModelId})`;
+                        option.selected = true;
+                        modelSelector.appendChild(option);
+                    }
+                    
+                    // 如果没有模型可用，显示提示
+                    if (modelSelector.options.length === 0) {
+                        const option = document.createElement('option');
+                        option.value = "";
+                        option.textContent = "没有可用模型";
+                        modelSelector.appendChild(option);
+                    }
+                } catch (error) {
+                    console.error('Error loading models:', error);
+                    modelSelector.innerHTML = '<option value="">加载模型失败</option>';
+                }
+            }
+            
+            // 页面加载时获取模型列表
+            loadModels();
             
             // 发送消息函数
             async function sendMessage() {
                 const userMessage = userInput.value.trim();
                 if (!userMessage) return;
+                
+                // 获取当前选择的模型
+                const modelSelector = document.getElementById('modelSelector');
+                const selectedModel = modelSelector.value;
                 
                 // 清空输入框
                 userInput.value = '';
@@ -361,7 +467,10 @@
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ message: userMessage })
+                        body: JSON.stringify({ 
+                            message: userMessage,
+                            modelId: selectedModel
+                        })
                     });
                     
                     if (!response.ok) {
@@ -394,6 +503,12 @@
                 // 滚动到最新消息
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
+            
+            // 模型选择变更事件
+            document.getElementById('modelSelector').addEventListener('change', function() {
+                const modelName = this.options[this.selectedIndex].text;
+                addMessage(`已切换到 ${modelName} 模型`, 'bot');
+            });
             
             // 事件监听器
             sendButton.addEventListener('click', sendMessage);
