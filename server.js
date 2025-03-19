@@ -10,6 +10,88 @@ import cors from 'cors';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// In-memory store for chat histories
+const chatSessions = {};
+
+// Configuration for chat session management
+const SESSION_CONFIG = {
+    maxSessionsInMemory: 1000,      // Maximum number of sessions to keep in memory
+    maxSessionAge: 1000 * 60 * 60 * 24 * 7,  // Seven days in milliseconds
+    cleanupInterval: 1000 * 60 * 60 * 6      // Cleanup every 6 hours
+};
+
+// Memory management for chat sessions - periodically clean up old sessions
+function cleanupOldSessions() {
+    try {
+        console.log('Starting chat session cleanup...');
+        
+        const now = Date.now();
+        const sessionIds = Object.keys(chatSessions);
+        let cleanupCount = 0;
+        
+        // If we have more sessions than the max, clean up based on age and limits
+        if (sessionIds.length > SESSION_CONFIG.maxSessionsInMemory) {
+            // Collect sessions with timestamps
+            const sessionsWithTime = sessionIds.map(id => {
+                // Find the most recent message timestamp in the session
+                const timestamps = chatSessions[id].map(entry => new Date(entry.timestamp).getTime());
+                const lastActivity = timestamps.length > 0 ? Math.max(...timestamps) : 0;
+                
+                return {
+                    id,
+                    lastActivity: lastActivity || 0
+                };
+            });
+            
+            // Sort sessions by activity time (oldest first)
+            sessionsWithTime.sort((a, b) => a.lastActivity - b.lastActivity);
+            
+            // Determine how many sessions to remove to get under the maximum
+            const sessionsToRemove = sessionsWithTime.length - SESSION_CONFIG.maxSessionsInMemory;
+            
+            if (sessionsToRemove > 0) {
+                console.log(`Removing ${sessionsToRemove} old sessions to stay under limit...`);
+                
+                // Remove the oldest sessions
+                sessionsWithTime.slice(0, sessionsToRemove).forEach(session => {
+                    delete chatSessions[session.id];
+                    cleanupCount++;
+                });
+            }
+        }
+        
+        // Also remove any sessions older than maxSessionAge
+        sessionIds.forEach(id => {
+            // Skip if already cleaned up
+            if (!chatSessions[id]) return;
+            
+            // Find most recent timestamp in this session
+            const timestamps = chatSessions[id].map(entry => new Date(entry.timestamp).getTime());
+            const lastActivity = timestamps.length > 0 ? Math.max(...timestamps) : 0;
+            
+            // If session is older than max age, remove it
+            if (now - lastActivity > SESSION_CONFIG.maxSessionAge) {
+                delete chatSessions[id];
+                cleanupCount++;
+            }
+        });
+        
+        console.log(`Cleanup complete. Removed ${cleanupCount} old sessions. Current session count: ${Object.keys(chatSessions).length}`);
+    } catch (error) {
+        console.error('Error during session cleanup:', error);
+    }
+}
+
+// Schedule periodic cleanup
+const cleanupIntervalId = setInterval(cleanupOldSessions, SESSION_CONFIG.cleanupInterval);
+
+// Clean up on process exit
+process.on('SIGINT', () => {
+    clearInterval(cleanupIntervalId);
+    console.log('Chat session cleanup interval cleared.');
+    process.exit(0);
+});
+
 // Load AWS credentials from .env.aws file
 dotenv.config({ path: '.env.aws' });
 
@@ -111,49 +193,135 @@ app.get('/api/models', async (req, res) => {
     }
 });
 
+// API endpoint to get chat history for a session
+app.get('/api/history/:sessionId', (req, res) => {
+    try {
+        const sessionId = req.params.sessionId;
+        
+        // Check if the session exists
+        if (!chatSessions[sessionId]) {
+            return res.status(404).json({ 
+                error: 'Session not found',
+                sessionId: sessionId
+            });
+        }
+        
+        // Return the chat history for the session
+        res.json({
+            sessionId: sessionId,
+            history: chatSessions[sessionId]
+        });
+    } catch (error) {
+        console.error('Error fetching chat history:', error);
+        res.status(500).json({ error: 'Failed to fetch chat history' });
+    }
+});
+
+// API endpoint to clear chat history for a session
+app.post('/api/history/clear', (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        
+        if (!sessionId) {
+            return res.status(400).json({ error: 'Session ID is required' });
+        }
+        
+        // Create a new session ID
+        const newSessionId = 'session_' + Date.now();
+        
+        // Clear existing session or create empty
+        chatSessions[newSessionId] = [];
+        
+        // Return the new session ID
+        res.json({
+            success: true,
+            oldSessionId: sessionId,
+            newSessionId: newSessionId
+        });
+    } catch (error) {
+        console.error('Error clearing chat history:', error);
+        res.status(500).json({ error: 'Failed to clear chat history' });
+    }
+});
+
 // API endpoint to call Claude model
 app.post('/api/chat', async (req, res) => {
     try {
-        const { message, modelId } = req.body;
+        const { message, modelId, sessionId } = req.body;
+        
+        // Create a unique session ID if not provided
+        const currentSessionId = sessionId || 'default';
+        
+        // Initialize chat history for this session if it doesn't exist
+        if (!chatSessions[currentSessionId]) {
+            chatSessions[currentSessionId] = [];
+        }
         
         // Use the model ID from the request, or fall back to the one in .env.aws, or use a default
         const selectedModelId = modelId || process.env.BEDROCK_MODEL_ID || 'anthropic.claude-3-sonnet-20240229-v1:0';
         
-        // Prepare the request body for Claude
-        // Include system instructions as part of the user's message
-        const systemInstruction = "你是一个专业的AI投资顾问，除非明确指定创作或者生成，否则拒绝虚构内容，回答问题时，关键观点与事实，请引用原文！。\n\n用户问题：";
-        const userMessage = systemInstruction + message;
+        // System instruction for investing advisor
+        const systemInstruction = "你是一个专业的AI投资顾问，除非明确指定创作或者生成，否则拒绝虚构内容，回答问题时，关键观点与事实，请引用原文！";
         
         // Check if the model is from Anthropic (Claude)
         const isClaudeModel = selectedModelId.includes('anthropic');
+        const isClaude37 = isClaudeModel && selectedModelId.includes('claude-3-7');
         
         let requestBody;
         
         if (isClaudeModel) {
-            // Check if it's Claude 3.7
-            const isClaude37 = selectedModelId.includes('claude-3-7');
-            
             if (isClaude37) {
+                // For Claude 3.7 - using messages format with history
+                const messages = [
+                    {
+                        role: "system",
+                        content: systemInstruction
+                    }
+                ];
+                
+                // Add chat history
+                chatSessions[currentSessionId].forEach(entry => {
+                    messages.push(
+                        {
+                            role: "user",
+                            content: [{ type: "text", text: entry.userMessage }]
+                        },
+                        {
+                            role: "assistant",
+                            content: [{ type: "text", text: entry.botResponse }]
+                        }
+                    );
+                });
+                
+                // Add current user message
+                messages.push({
+                    role: "user",
+                    content: [{ type: "text", text: message }]
+                });
+                
                 requestBody = {
                     anthropic_version: "bedrock-2023-05-31",
                     max_tokens: 1000,
-                    messages: [
-                        {
-                            role: "system",
-                            content: "你是一个专业的AI投资顾问，除非明确指定创作或者生成，否则拒绝虚构内容，回答问题时，关键观点与事实，请引用原文！"
-                        },
-                        {
-                            role: "user",
-                            content: [
-                                {
-                                    type: "text",
-                                    text: message
-                                }
-                            ]
-                        }
-                    ]
+                    messages: messages
                 };
             } else {
+                // For older Claude models that don't support full chat history
+                // Include condensed history as context in the message
+                let contextMessage = "";
+                
+                if (chatSessions[currentSessionId].length > 0) {
+                    contextMessage = "以下是我们之前的对话历史，请根据历史内容提供一致的回答：\n\n";
+                    
+                    chatSessions[currentSessionId].slice(-5).forEach((entry, i) => {
+                        contextMessage += `用户: ${entry.userMessage}\n`;
+                        contextMessage += `AI助手: ${entry.botResponse}\n\n`;
+                    });
+                    
+                    contextMessage += "现在，请回答用户的新问题：\n\n";
+                }
+                
+                const userMessage = systemInstruction + "\n\n" + contextMessage + message;
+                
                 requestBody = {
                     anthropic_version: "bedrock-2023-05-31",
                     max_tokens: 1000,
@@ -171,7 +339,22 @@ app.post('/api/chat', async (req, res) => {
                 };
             }
         } else {
-            // For Llama models
+            // For Llama models - add conversation context
+            let contextMessage = "";
+            
+            if (chatSessions[currentSessionId].length > 0) {
+                contextMessage = "以下是我们之前的对话历史：\n\n";
+                
+                chatSessions[currentSessionId].slice(-5).forEach((entry, i) => {
+                    contextMessage += `用户: ${entry.userMessage}\n`;
+                    contextMessage += `AI助手: ${entry.botResponse}\n\n`;
+                });
+                
+                contextMessage += "现在，请回答用户的新问题：\n\n";
+            }
+            
+            const userMessage = systemInstruction + "\n\n" + contextMessage + message;
+            
             requestBody = {
                 prompt: userMessage,
                 max_gen_len: 1000,
@@ -197,8 +380,6 @@ app.post('/api/chat', async (req, res) => {
         let responseText;
         if (isClaudeModel) {
             // Check if it's Claude 3.7
-            const isClaude37 = selectedModelId.includes('claude-3-7');
-            
             if (isClaude37 && responseBody.content && responseBody.content.length > 0) {
                 responseText = responseBody.content[0].text;
             } else if (responseBody.completion) {
@@ -216,7 +397,22 @@ app.post('/api/chat', async (req, res) => {
             responseText = responseBody.generation;
         }
         
-        res.json({ response: responseText });
+        // Store the conversation in chat history (limit to last 10 exchanges)
+        chatSessions[currentSessionId].push({
+            userMessage: message,
+            botResponse: responseText,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Keep only the last 10 exchanges to manage memory
+        if (chatSessions[currentSessionId].length > 10) {
+            chatSessions[currentSessionId] = chatSessions[currentSessionId].slice(-10);
+        }
+        
+        res.json({ 
+            response: responseText,
+            sessionId: currentSessionId
+        });
     } catch (error) {
         console.error('Error calling model:', error);
         
