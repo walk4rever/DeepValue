@@ -49,8 +49,24 @@ app.get('/api/models', async (req, res) => {
         // Create the command to list foundation models
         const command = new ListFoundationModelsCommand({});
         
+        console.log('Fetching available foundation models...');
+        
         // Execute the command
         const response = await bedrockManagementClient.send(command);
+        
+        console.log(`Found ${response.modelSummaries.length} foundation models`);
+        
+        // Log available Claude models for debugging
+        const claudeModels = response.modelSummaries
+            .filter(model => model.providerName === 'Anthropic')
+            .map(model => ({
+                id: model.modelId,
+                name: model.modelName,
+                status: model.modelLifecycle.status,
+                supportedTypes: model.inferenceTypesSupported || []
+            }));
+            
+        console.log('Available Claude models:', JSON.stringify(claudeModels, null, 2));
         
         // Filter and format the models
         const models = response.modelSummaries
@@ -68,7 +84,7 @@ app.get('/api/models', async (req, res) => {
             }));
         
         // Add the default model from .env.aws if it exists
-        const defaultModelId = process.env.BEDROCK_MODEL_ID;
+        const defaultModelId = process.env.BEDROCK_MODEL_ID || 'anthropic.claude-3-sonnet-20240229-v1:0';
         
         // 检查默认模型是否在支持的模型列表中
         const defaultModelSupported = models.some(model => model.id === defaultModelId);
@@ -109,26 +125,51 @@ app.post('/api/chat', async (req, res) => {
         const userMessage = systemInstruction + message;
         
         // Check if the model is from Anthropic (Claude)
-        const isClaudeModel = modelId.includes('anthropic');
+        const isClaudeModel = selectedModelId.includes('anthropic');
         
         let requestBody;
         
         if (isClaudeModel) {
-            requestBody = {
-                anthropic_version: "bedrock-2023-05-31",
-                max_tokens: 1000,
-                messages: [
-                    {
-                        role: "user",
-                        content: [
-                            {
-                                type: "text",
-                                text: userMessage
-                            }
-                        ]
-                    }
-                ]
-            };
+            // Check if it's Claude 3.7
+            const isClaude37 = selectedModelId.includes('claude-3-7');
+            
+            if (isClaude37) {
+                requestBody = {
+                    anthropic_version: "bedrock-2023-05-31",
+                    max_tokens: 1000,
+                    messages: [
+                        {
+                            role: "system",
+                            content: "你是一个专业的AI投资顾问，除非明确指定创作或者生成，否则拒绝虚构内容，回答问题时，关键观点与事实，请引用原文！"
+                        },
+                        {
+                            role: "user",
+                            content: [
+                                {
+                                    type: "text",
+                                    text: message
+                                }
+                            ]
+                        }
+                    ]
+                };
+            } else {
+                requestBody = {
+                    anthropic_version: "bedrock-2023-05-31",
+                    max_tokens: 1000,
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                {
+                                    type: "text",
+                                    text: userMessage
+                                }
+                            ]
+                        }
+                    ]
+                };
+            }
         } else {
             // For Llama models
             requestBody = {
@@ -141,7 +182,7 @@ app.post('/api/chat', async (req, res) => {
 
         // Create the command
         const command = new InvokeModelCommand({
-            modelId: modelId,
+            modelId: selectedModelId,
             contentType: 'application/json',
             accept: 'application/json',
             body: JSON.stringify(requestBody)
@@ -155,7 +196,21 @@ app.post('/api/chat', async (req, res) => {
         
         let responseText;
         if (isClaudeModel) {
-            responseText = responseBody.content[0].text;
+            // Check if it's Claude 3.7
+            const isClaude37 = selectedModelId.includes('claude-3-7');
+            
+            if (isClaude37 && responseBody.content && responseBody.content.length > 0) {
+                responseText = responseBody.content[0].text;
+            } else if (responseBody.completion) {
+                // For older Claude models
+                responseText = responseBody.completion;
+            } else if (responseBody.content && responseBody.content.length > 0) {
+                // For standard Claude 3 models
+                responseText = responseBody.content[0].text;
+            } else {
+                console.error('Unexpected Claude response format:', responseBody);
+                responseText = 'Error: Unexpected response format from Claude model';
+            }
         } else {
             // For Llama models
             responseText = responseBody.generation;
@@ -164,7 +219,27 @@ app.post('/api/chat', async (req, res) => {
         res.json({ response: responseText });
     } catch (error) {
         console.error('Error calling model:', error);
-        res.status(500).json({ error: 'Failed to process your request' });
+        
+        // Provide a more descriptive error message based on the error type
+        let errorMessage = 'Failed to process your request';
+        
+        if (error.name === 'ValidationException') {
+            if (error.message.includes("on-demand throughput isn't supported")) {
+                errorMessage = 'Selected model requires provisioned throughput. Please select a different model or contact your AWS administrator to set up an inference profile.';
+                console.log('Switching to a supported model for future requests');
+            } else {
+                errorMessage = `Validation error: ${error.message}`;
+            }
+        } else if (error.name === 'AccessDeniedException') {
+            errorMessage = 'Access denied. Please check your AWS credentials and permissions.';
+        } else if (error.name === 'ThrottlingException') {
+            errorMessage = 'Request was throttled. Please try again later.';
+        }
+        
+        res.status(500).json({ 
+            error: errorMessage,
+            details: error.message
+        });
     }
 });
 
