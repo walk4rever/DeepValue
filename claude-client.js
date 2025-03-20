@@ -34,9 +34,7 @@ export class ClaudeClient {
                     messages: formattedMessages,
                     temperature: 0.7,
                     top_p: 0.9,
-                    system: enableReasoning ? 
-                        "You are a helpful AI assistant specialized in investment analysis. When answering, follow this exact format: First, write 'Thinking Process:' and think step by step about the problem. Then, write 'Final Answer:' followed by your concise answer based on your reasoning. Never repeat your thinking in your final answer." :
-                        "You are a helpful AI assistant specialized in investment analysis."
+                    system: "除非明确指定创作或者生成，否则拒绝虚构内容，回答问题时，关键观点与事实，请引用原文！"
                 })
             };
             
