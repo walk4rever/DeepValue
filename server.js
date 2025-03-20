@@ -154,6 +154,32 @@ app.get('/api/chat', async (req, res) => {
     }
 });
 
+// API endpoint to fetch chat history
+app.get('/api/history', async (req, res) => {
+    try {
+        const { sessionId } = req.query;
+        
+        if (!sessionId) {
+            return res.status(400).json({ error: "Session ID is required" });
+        }
+        
+        // Get messages for the session
+        const messages = await chatHistoryService.getMessages(sessionId);
+        
+        res.json({
+            success: true,
+            sessionId,
+            messages
+        });
+    } catch (error) {
+        console.error('Error fetching chat history:', error);
+        res.status(500).json({ 
+            error: "Failed to fetch chat history. Please try again.",
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+});
+
 // API endpoint to clear chat history
 app.post('/api/history/clear', async (req, res) => {
     try {

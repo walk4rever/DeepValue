@@ -21,8 +21,53 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Created new session ID:', currentSessionId);
     }
     
-    // Load chat history from local storage
-    function loadChatHistory() {
+    // Load chat history from DynamoDB first, then fallback to local storage
+    async function loadChatHistory() {
+        try {
+            // First try to fetch messages from DynamoDB via API
+            const response = await fetch(`/api/history?sessionId=${currentSessionId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Clear existing messages
+                chatMessages.innerHTML = '';
+                
+                // Add each message to the UI
+                if (data.messages && data.messages.length > 0) {
+                    data.messages.forEach(msg => {
+                        addMessage(msg.content, msg.role, false);
+                    });
+                    
+                    // Update local storage with the latest from DynamoDB
+                    saveChatHistory();
+                    
+                    console.log('Loaded', data.messages.length, 'messages from DynamoDB');
+                } else {
+                    // If no messages in DynamoDB, try local storage as fallback
+                    loadFromLocalStorage();
+                }
+            } else {
+                // If API call fails, fall back to local storage
+                loadFromLocalStorage();
+            }
+        } catch (error) {
+            console.error('Error fetching chat history from server:', error);
+            // Fall back to local storage
+            loadFromLocalStorage();
+        }
+        
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    
+    // Helper function to load from local storage
+    function loadFromLocalStorage() {
         const storedMessages = localStorage.getItem('chatMessages_' + currentSessionId);
         if (storedMessages) {
             try {
@@ -36,10 +81,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     addMessage(msg.text, msg.sender, false);
                 });
                 
-                // Scroll to bottom
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                
-                console.log('Loaded', messages.length, 'messages from history');
+                console.log('Loaded', messages.length, 'messages from local storage');
             } catch (e) {
                 console.error('Failed to parse chat history:', e);
             }
@@ -66,8 +108,12 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.setItem('chatMessages_' + currentSessionId, JSON.stringify(messages));
     }
     
-    // Load chat history from storage
-    loadChatHistory();
+    // Load chat history from DynamoDB and then local storage as fallback
+    loadChatHistory().catch(err => {
+        console.error('Error loading chat history:', err);
+        // If async loading fails, try local storage as fallback
+        loadFromLocalStorage();
+    });
     
     // 发送消息函数
     async function sendMessage() {
@@ -245,7 +291,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function addMessage(text, sender, saveHistory = true) {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message');
-        messageDiv.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
+        
+        // Map DynamoDB role names to UI class names
+        if (sender === 'user') {
+            messageDiv.classList.add('user-message');
+        } else if (sender === 'bot' || sender === 'assistant') {
+            messageDiv.classList.add('bot-message');
+        }
         
         // 对于机器人消息，使用marked渲染markdown
         if (sender === 'bot' || sender === 'assistant') {
