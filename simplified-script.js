@@ -337,11 +337,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const data = await response.json();
             
-            // Update to the new session ID
-            if (data.newSessionId) {
-                currentSessionId = data.newSessionId;
-                localStorage.setItem('chatSessionId', currentSessionId);
-            }
+            // Keep using the same session ID (no need to update)
+            console.log('Chat history cleared for session:', currentSessionId);
             
             // Clear UI
             chatMessages.innerHTML = '';
@@ -349,10 +346,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add welcome message
             addMessage('您好！我是您的投资AI助手。我可以帮您分析股票、解答投资问题或提供市场见解。请告诉我您想了解什么？', 'bot');
             
-            // Clear local storage for old session
-            localStorage.removeItem('chatMessages_' + data.oldSessionId);
-            
-            console.log('Chat history cleared, new session:', currentSessionId);
+            // Clear local storage for current session
+            localStorage.removeItem('chatMessages_' + currentSessionId);
         } catch (error) {
             console.error('Error clearing chat history:', error);
             
@@ -360,10 +355,8 @@ document.addEventListener('DOMContentLoaded', function() {
             chatMessages.innerHTML = '';
             addMessage('您好！我是您的投资AI助手。我可以帮您分析股票、解答投资问题或提供市场见解。请告诉我您想了解什么？', 'bot');
             
-            // Generate new session locally
+            // Clear local storage for current session
             localStorage.removeItem('chatMessages_' + currentSessionId);
-            currentSessionId = 'session_' + Date.now();
-            localStorage.setItem('chatSessionId', currentSessionId);
         }
     }
     

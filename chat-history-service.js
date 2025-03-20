@@ -155,21 +155,12 @@ export class ChatHistoryService {
         }
       }
       
-      // Create a new session
-      const newSessionId = 'session_' + Date.now();
-      await this.createSession(newSessionId);
-      
-      return newSessionId;
+      // Return the same session ID instead of creating a new one
+      return sessionId;
     } catch (error) {
       console.error(`Error clearing session ${sessionId}:`, error);
-      // If there's an error, still try to create a new session
-      const newSessionId = 'session_' + Date.now();
-      try {
-        await this.createSession(newSessionId);
-      } catch (createError) {
-        console.error(`Error creating new session after clear:`, createError);
-      }
-      return newSessionId;
+      // Return the original session ID even if there's an error
+      return sessionId;
     }
   }
 

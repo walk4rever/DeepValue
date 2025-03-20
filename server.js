@@ -189,13 +189,12 @@ app.post('/api/history/clear', async (req, res) => {
             return res.status(400).json({ error: "Session ID is required" });
         }
         
-        // Clear session and create a new one
-        const newSessionId = await chatHistoryService.clearSession(sessionId);
+        // Clear session messages but keep the same session ID
+        const clearedSessionId = await chatHistoryService.clearSession(sessionId);
         
         res.json({
             success: true,
-            oldSessionId: sessionId,
-            newSessionId
+            sessionId: clearedSessionId
         });
     } catch (error) {
         console.error('Error clearing chat history:', error);
