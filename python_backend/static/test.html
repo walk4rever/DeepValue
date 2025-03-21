@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepValue API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #0071e3;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #0071e3;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0052a3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f5f5f7;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>DeepValue API Test</h1>
+    
+    <div class="test-section">
+        <div class="test-title">Test POST /api/chat</div>
+        <div class="input-group">
+            <label for="message">Message:</label>
+            <textarea id="message" rows="3">分析阿里巴巴(BABA)的投资价值</textarea>
+        </div>
+        <div class="input-group">
+            <label for="sessionId">Session ID (optional):</label>
+            <input type="text" id="sessionId" placeholder="Leave empty to create new session">
+        </div>
+        <div class="input-group">
+            <label>
+                <input type="checkbox" id="enableReasoning"> Enable Reasoning
+            </label>
+        </div>
+        <button id="testChatBtn">Test Chat API</button>
+        <div id="chatResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <div class="test-title">Test GET /api/history</div>
+        <div class="input-group">
+            <label for="historySessionId">Session ID:</label>
+            <input type="text" id="historySessionId" placeholder="Enter session ID">
+        </div>
+        <button id="testHistoryBtn">Test History API</button>
+        <div id="historyResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <div class="test-title">Test POST /api/history/clear</div>
+        <div class="input-group">
+            <label for="clearSessionId">Session ID:</label>
+            <input type="text" id="clearSessionId" placeholder="Enter session ID">
+        </div>
+        <button id="testClearBtn">Test Clear History API</button>
+        <div id="clearResult" class="result"></div>
+    </div>
+    
+    <script>
+        document.getElementById('testChatBtn').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('chatResult');
+            resultDiv.textContent = 'Sending request...';
+            resultDiv.classList.remove('error');
+            
+            const message = document.getElementById('message').value;
+            const sessionId = document.getElementById('sessionId').value || null;
+            const enableReasoning = document.getElementById('enableReasoning').checked;
+            
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message,
+                        sessionId,
+                        enableReasoning
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Update session ID field with the returned session ID
+                if (data.sessionId) {
+                    document.getElementById('sessionId').value = data.sessionId;
+                    document.getElementById('historySessionId').value = data.sessionId;
+                    document.getElementById('clearSessionId').value = data.sessionId;
+                }
+                
+                // Display result
+                resultDiv.textContent = `Success!\n\nSession ID: ${data.sessionId}\n\nResponse (first 100 chars):\n${data.response.substring(0, 100)}...\n\nFull response length: ${data.response.length} characters`;
+                
+                if (data.reasoning) {
+                    resultDiv.textContent += `\n\nReasoning (first 100 chars):\n${data.reasoning.substring(0, 100)}...\n\nFull reasoning length: ${data.reasoning.length} characters`;
+                }
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.classList.add('error');
+            }
+        });
+        
+        document.getElementById('testHistoryBtn').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('historyResult');
+            resultDiv.textContent = 'Sending request...';
+            resultDiv.classList.remove('error');
+            
+            const sessionId = document.getElementById('historySessionId').value;
+            
+            if (!sessionId) {
+                resultDiv.textContent = 'Error: Session ID is required';
+                resultDiv.classList.add('error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/history?sessionId=${encodeURIComponent(sessionId)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Display result
+                resultDiv.textContent = `Success: ${data.success}\n\nSession ID: ${data.sessionId}\n\nMessages: ${data.messages.length}\n\n`;
+                
+                data.messages.forEach((msg, index) => {
+                    resultDiv.textContent += `Message ${index + 1}: ${msg.role} - ${msg.content.length} characters\n`;
+                });
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.classList.add('error');
+            }
+        });
+        
+        document.getElementById('testClearBtn').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('clearResult');
+            resultDiv.textContent = 'Sending request...';
+            resultDiv.classList.remove('error');
+            
+            const sessionId = document.getElementById('clearSessionId').value;
+            
+            if (!sessionId) {
+                resultDiv.textContent = 'Error: Session ID is required';
+                resultDiv.classList.add('error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/history/clear', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        sessionId
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Display result
+                resultDiv.textContent = `Success: ${data.success}\n\nSession ID: ${data.sessionId}\n\nHistory cleared!`;
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.classList.add('error');
+            }
+        });
+    </script>
+</body>
+</html>
