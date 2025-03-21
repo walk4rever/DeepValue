@@ -30,7 +30,7 @@ app.post('/api/chat', async (req, res) => {
         const { message, sessionId, enableReasoning } = req.body;
         
         // Always use Claude 3.7
-        const modelId = 'anthropic.claude-3-7-sonnet-20250219-v1:0';
+        const modelId = 'us.anthropic.claude-3-7-sonnet-20250219-v1:0';
         
         // Get or create session
         let session = await chatHistoryService.getSession(sessionId);
