@@ -87,7 +87,8 @@ async function handleSubmit(event) {
     scrollToBottom();
     
     // Get reasoning toggle state
-    const enableReasoning = reasoningToggle && reasoningToggle.checked;
+    //const enableReasoning = reasoningToggle && reasoningToggle.checked;
+    const enableReasoning = true;
     
     // Close any existing event source
     if (eventSource) {

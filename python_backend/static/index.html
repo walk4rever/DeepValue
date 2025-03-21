@@ -840,10 +840,10 @@
                 const selectedModel = modelSelector.value;
                 
                 // 检查是否启用推理功能（仅适用于Claude 3.7）
-                const enableReasoning = document.getElementById('enable-reasoning')?.checked || false;
+                const enableReasoning = document.getElementById('enable-reasoning')?.checked || true;
                 
                 // 检查是否启用流式响应
-                const useStreaming = document.getElementById('enable-streaming')?.checked || false;
+                const useStreaming = document.getElementById('enable-streaming')?.checked || true;
                 
                 // 清空输入框
                 userInput.value = '';

@@ -4,9 +4,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const sendButton = document.getElementById('sendButton');
     const clearButton = document.getElementById('clearButton');
     
-    // Using Claude 3.7 model directly
-    const modelId = 'anthropic.claude-3-7-sonnet-20250219-v1:0';
-    
     // Session management
     let currentSessionId = null;
     
